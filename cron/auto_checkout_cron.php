@@ -1,8 +1,9 @@
 <?php
 /**
- * REBUILT Auto Checkout Cron Job - Day 7 Final Solution
+ * REBUILT Auto Checkout Cron Job - Final Solution
  * GUARANTEED daily 10:00 AM execution with bulletproof logic
  * SIMPLIFIED - NO PAYMENT CALCULATION
+ * MANUAL PAYMENT ONLY - Admin marks payments after checkout
  * 
  * HOSTINGER CRON JOB COMMAND:
  * 0 10 * * * /usr/bin/php /home/u261459251/domains/lpstnashik.in/public_html/cron/auto_checkout_cron.php
@@ -45,7 +46,7 @@ if ($isManualRun) {
     echo "<!DOCTYPE html><html><head><title>Auto Checkout Execution</title>";
     echo "<style>body{font-family:Arial;margin:20px;line-height:1.6;} .success{color:green;font-weight:bold;} .error{color:red;font-weight:bold;} .warning{color:orange;font-weight:bold;} .info{color:blue;font-weight:bold;}</style>";
     echo "</head><body>";
-    echo "<h2>🕙 Daily 10:00 AM Auto Checkout Execution - Day 7 Final Fix</h2>";
+    echo "<h2>🕙 Daily 10:00 AM Auto Checkout Execution - Final Solution</h2>";
     echo "<p><strong>Current Time:</strong> " . date('H:i:s') . " (Asia/Kolkata)</p>";
     echo "<p><strong>Current Date:</strong> " . date('Y-m-d') . "</p>";
     echo "<p><strong>Execution Mode:</strong> " . ($isManualRun ? 'MANUAL TEST' : 'AUTOMATIC CRON') . "</p>";
@@ -59,6 +60,36 @@ logMessage("Execution mode: " . ($isManualRun ? 'MANUAL TEST' : 'AUTOMATIC CRON'
 logMessage("Target execution time: 10:00-10:05 AM daily");
 logMessage("Current server time: " . date('H:i:s'));
 logMessage("Payment mode: MANUAL ONLY (no automatic calculation)");
+
+// BULLETPROOF TIME CHECK FOR AUTOMATIC RUNS
+if (!$isManualRun) {
+    $currentHour = (int)date('H');
+    $currentMinute = (int)date('i');
+    
+    logMessage("Time check: Hour=$currentHour, Minute=$currentMinute");
+    
+    // EXACT HOUR CHECK - MUST BE 10
+    if ($currentHour !== 10) {
+        logMessage("EXECUTION BLOCKED: Wrong hour ($currentHour). Auto checkout only runs at hour 10.", 'SKIP');
+        if ($isManualRun) {
+            echo "<p class='warning'>⚠️ Not time for auto checkout. Current hour: $currentHour, Required: 10</p>";
+            echo "</body></html>";
+        }
+        exit(0);
+    }
+    
+    // EXACT MINUTE CHECK - MUST BE 0-5
+    if ($currentMinute > 5) {
+        logMessage("EXECUTION BLOCKED: Wrong minute ($currentMinute). Execution window is 0-5 minutes.", 'SKIP');
+        if ($isManualRun) {
+            echo "<p class='warning'>⚠️ Outside execution window. Current minute: $currentMinute, Window: 0-5</p>";
+            echo "</body></html>";
+        }
+        exit(0);
+    }
+    
+    logMessage("TIME CHECK PASSED: Hour=10, Minute=$currentMinute (within 0-5 window)");
+}
 
 // Database connection with proper error handling
 try {
@@ -91,7 +122,7 @@ try {
 }
 
 // Verify required tables exist
-$requiredTables = ['bookings', 'resources', 'auto_checkout_logs', 'system_settings', 'cron_execution_logs'];
+$requiredTables = ['bookings', 'resources', 'auto_checkout_logs', 'system_settings', 'cron_execution_logs', 'daily_execution_tracker'];
 foreach ($requiredTables as $table) {
     try {
         $stmt = $pdo->query("SELECT 1 FROM `$table` LIMIT 1");
@@ -106,6 +137,30 @@ foreach ($requiredTables as $table) {
             echo "</body></html>";
         }
         exit(1);
+    }
+}
+
+// Check if already executed today (for automatic runs only)
+if (!$isManualRun) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT execution_completed FROM daily_execution_tracker 
+            WHERE execution_date = CURDATE() 
+            AND execution_completed = 1
+        ");
+        $stmt->execute();
+        $alreadyExecuted = $stmt->fetchColumn();
+        
+        if ($alreadyExecuted) {
+            logMessage("EXECUTION BLOCKED: Already executed today", 'SKIP');
+            exit(0);
+        }
+        
+        logMessage("Daily execution check passed - proceeding");
+        
+    } catch (Exception $e) {
+        logMessage("Error checking daily execution: " . $e->getMessage(), 'WARNING');
+        // Continue execution if check fails
     }
 }
 

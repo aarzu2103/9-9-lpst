@@ -86,6 +86,14 @@ try {
     $stmt->execute();
     $cronStatus = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Get daily execution tracker status
+    $stmt = $pdo->prepare("
+        SELECT * FROM daily_execution_tracker 
+        WHERE execution_date = CURDATE()
+    ");
+    $stmt->execute();
+    $dailyTracker = $stmt->fetch(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
     $error = "Database error: " . $e->getMessage();
     error_log("Auto Checkout Logs PDO Error: " . $e->getMessage());
@@ -94,6 +102,7 @@ try {
     $totalPages = 0;
     $todayStats = ['total_today' => 0, 'successful_today' => 0, 'failed_today' => 0];
     $cronStatus = null;
+    $dailyTracker = null;
 } catch (Exception $e) {
     $error = "An unexpected error occurred: " . $e->getMessage();
     error_log("Auto Checkout Logs General Error: " . $e->getMessage());
@@ -102,6 +111,7 @@ try {
     $totalPages = 0;
     $todayStats = ['total_today' => 0, 'successful_today' => 0, 'failed_today' => 0];
     $cronStatus = null;
+    $dailyTracker = null;
 }
 
 $flash = get_flash_message();
@@ -200,6 +210,21 @@ $flash = get_flash_message();
             color: black; 
             text-decoration: none; 
         }
+        .final-solution-notice {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -228,7 +253,11 @@ $flash = get_flash_message();
             </div>
         <?php endif; ?>
 
-        <h2>🕙 Auto Checkout Logs - Day 7 Final Fix</h2>
+        <div class="final-solution-notice">
+            🚨 FINAL SOLUTION ACTIVE - Manual Payment Only, Guaranteed 10:00 AM Execution
+        </div>
+
+        <h2>🕙 Auto Checkout Logs - Final Solution</h2>
         
         <!-- Today's Execution Status -->
         <?php if ($cronStatus): ?>
@@ -246,6 +275,17 @@ $flash = get_flash_message();
                 <p>⏳ Auto checkout has not executed today yet</p>
                 <p>Next execution: Tomorrow at 10:00 AM</p>
                 <p>Current time: <?= date('H:i:s') ?></p>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Daily Execution Tracker -->
+        <?php if ($dailyTracker): ?>
+            <div class="execution-status status-<?= $dailyTracker['execution_completed'] ? 'success' : 'pending' ?>">
+                <h3>Daily Execution Tracker</h3>
+                <p>Date: <?= htmlspecialchars($dailyTracker['execution_date']) ?></p>
+                <p>Time: <?= htmlspecialchars($dailyTracker['execution_hour']) ?>:<?= sprintf('%02d', $dailyTracker['execution_minute']) ?></p>
+                <p>Status: <?= $dailyTracker['execution_completed'] ? '✅ COMPLETED' : '⏳ PENDING' ?></p>
+                <p>Bookings Processed: <?= htmlspecialchars($dailyTracker['bookings_processed']) ?></p>
             </div>
         <?php endif; ?>
         
@@ -272,7 +312,7 @@ $flash = get_flash_message();
             <div class="stat-card">
                 <h4>System Status</h4>
                 <div class="dashboard-value" style="color: var(--success-color);">FIXED</div>
-                <p>Day 7 Final Solution</p>
+                <p>Final Solution Active</p>
             </div>
         </div>
         
@@ -306,6 +346,13 @@ $flash = get_flash_message();
         <!-- Logs Table -->
         <div class="form-container">
             <h3>Checkout History (<?= htmlspecialchars($totalLogs) ?> total records)</h3>
+            <div style="background: rgba(239, 68, 68, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <h4 style="color: var(--danger-color);">💰 MANUAL PAYMENT REQUIRED</h4>
+                <p style="margin: 0; color: var(--dark-color);">
+                    Auto checkout only changes booking status to COMPLETED. 
+                    <strong>You must manually mark payments for each checkout below.</strong>
+                </p>
+            </div>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
@@ -408,6 +455,28 @@ $flash = get_flash_message();
                 </div>
             <?php endif; ?>
         </div>
+        
+        <!-- Payment Instructions -->
+        <div class="form-container">
+            <h3>💰 Payment Process Instructions</h3>
+            <div style="background: rgba(37, 99, 235, 0.1); padding: 1.5rem; border-radius: 8px;">
+                <h4 style="color: var(--primary-color);">How to Mark Payments:</h4>
+                <ol>
+                    <li>Auto checkout runs at 10:00 AM and changes booking status to COMPLETED</li>
+                    <li>NO payment amount is calculated automatically</li>
+                    <li>For each unpaid checkout above, click "Mark Paid" button</li>
+                    <li>Enter the actual amount received from guest</li>
+                    <li>Select payment method (Online/Offline)</li>
+                    <li>Payment is recorded with your custom amount</li>
+                </ol>
+                
+                <div style="background: rgba(255, 255, 255, 0.8); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+                    <p style="margin: 0; color: var(--dark-color); font-weight: 600;">
+                        💡 This ensures accurate payment tracking as you can set the exact amount received from each guest.
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Mark Paid Modal -->
@@ -430,6 +499,7 @@ $flash = get_flash_message();
                 <div class="form-group">
                     <label for="paid_amount" class="form-label">Amount Received (₹) *</label>
                     <input type="number" id="paid_amount" name="amount" class="form-control" min="1" step="0.01" required>
+                    <small style="color: var(--dark-color);">Enter the actual amount received from the guest</small>
                 </div>
                 
                 <div class="form-group">

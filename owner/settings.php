@@ -64,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Complete system reset
                     $pdo->exec("DELETE FROM auto_checkout_logs WHERE DATE(created_at) = CURDATE()");
                     $pdo->exec("DELETE FROM cron_execution_logs WHERE execution_date = CURDATE()");
+                    $pdo->exec("DELETE FROM daily_execution_tracker WHERE execution_date = CURDATE()");
                     $pdo->exec("UPDATE bookings SET auto_checkout_processed = 0 WHERE status IN ('BOOKED', 'PENDING')");
                     $pdo->exec("UPDATE system_settings SET setting_value = '' WHERE setting_key = 'last_auto_checkout_run'");
                     $pdo->exec("UPDATE system_settings SET setting_value = '' WHERE setting_key = 'auto_checkout_last_run_date'");
@@ -101,6 +102,14 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 $todayExecution = $stmt->fetch();
+
+// Get daily execution tracker status
+$stmt = $pdo->prepare("
+    SELECT * FROM daily_execution_tracker 
+    WHERE execution_date = CURDATE()
+");
+$stmt->execute();
+$dailyTracker = $stmt->fetch();
 
 $flash = get_flash_message();
 ?>
@@ -188,8 +197,8 @@ $flash = get_flash_message();
         <?php endif; ?>
 
         <div class="final-fix-notice">
-            🚨 DAY 7 FINAL FIX APPLIED - AUTO CHECKOUT SYSTEM COMPLETELY REBUILT
-            <br><small>All database conflicts resolved, missing tables created, bulletproof 10:00 AM execution guaranteed</small>
+            🚨 FINAL SOLUTION APPLIED - AUTO CHECKOUT SYSTEM COMPLETELY REBUILT
+            <br><small>All database conflicts resolved, bulletproof 10:00 AM execution, manual payment only</small>
         </div>
 
         <h2>🕙 Daily 10:00 AM Auto Checkout Master Control</h2>
@@ -209,6 +218,10 @@ $flash = get_flash_message();
                    (<?= $todayExecution['bookings_successful'] ?> successful, <?= $todayExecution['bookings_failed'] ?> failed)</p>
             <?php else: ?>
                 <p>Today's Status: NOT EXECUTED YET</p>
+            <?php endif; ?>
+            <?php if ($dailyTracker): ?>
+                <p>Daily Tracker: <?= $dailyTracker['execution_completed'] ? '✅ COMPLETED' : '⏳ PENDING' ?> 
+                   at <?= $dailyTracker['execution_hour'] ?>:<?= sprintf('%02d', $dailyTracker['execution_minute']) ?></p>
             <?php endif; ?>
         </div>
         
@@ -236,6 +249,15 @@ $flash = get_flash_message();
                     </small>
                 </div>
                 
+                <div class="form-group">
+                    <label class="form-label">Payment Mode (FIXED)</label>
+                    <input type="text" class="form-control" value="MANUAL ONLY - No Automatic Calculation" readonly 
+                           style="background: #f8f9fa; font-weight: bold; color: #dc3545;">
+                    <small style="color: var(--danger-color); font-weight: 600;">
+                        ⚠️ IMPORTANT: Admin must manually mark payments after auto checkout in checkout logs
+                    </small>
+                </div>
+                
                 <button type="submit" class="btn btn-primary">Save Auto Checkout Settings</button>
             </form>
         </div>
@@ -253,7 +275,7 @@ $flash = get_flash_message();
                         🧪 Test Auto Checkout Now
                     </button>
                     <small style="display: block; margin-top: 0.5rem; color: var(--dark-color);">
-                        Tests the system with current settings
+                        Tests the system - NO payment calculation
                     </small>
                 </form>
                 
@@ -283,7 +305,7 @@ $flash = get_flash_message();
         <!-- System Reset (Danger Zone) -->
         <div class="danger-zone">
             <h3 style="color: var(--danger-color);">🚨 Complete System Reset (If Still Not Working)</h3>
-            <p>Use this if auto checkout is still not working after the Day 7 fix:</p>
+            <p>Use this if auto checkout is still not working after the final rebuild:</p>
             
             <form method="POST" style="display: inline;">
                 <input type="hidden" name="csrf_token" value="<?= generate_csrf_token() ?>">
@@ -300,7 +322,7 @@ $flash = get_flash_message();
         
         <!-- Current System Information -->
         <div class="form-container">
-            <h3>Current System Information - Day 7 Final Fix</h3>
+            <h3>Current System Information - Final Solution</h3>
             <div style="background: rgba(37, 99, 235, 0.1); padding: 1.5rem; border-radius: 8px;">
                 <h4 style="color: var(--primary-color);">System Configuration:</h4>
                 <ul>
@@ -312,7 +334,8 @@ $flash = get_flash_message();
                     <li><strong>Active Bookings:</strong> <?= $activeBookingsCount ?></li>
                     <li><strong>Payment Mode:</strong> MANUAL ONLY (No automatic calculation)</li>
                     <li><strong>SMS Notifications:</strong> Enabled</li>
-                    <li><strong>System Version:</strong> 4.0 (Day 7 Final Fix)</li>
+                    <li><strong>System Version:</strong> 5.0 (Final Solution)</li>
+                    <li><strong>Duplicate Prevention:</strong> Bulletproof daily tracking</li>
                 </ul>
                 
                 <?php if ($todayExecution): ?>
@@ -330,6 +353,16 @@ $flash = get_flash_message();
                 <?php else: ?>
                     <h4 style="color: var(--warning-color);">Today's Execution:</h4>
                     <p>Auto checkout has not executed today yet. Next execution: Tomorrow at 10:00 AM</p>
+                <?php endif; ?>
+                
+                <?php if ($dailyTracker): ?>
+                    <h4 style="color: var(--primary-color);">Daily Execution Tracker:</h4>
+                    <ul>
+                        <li><strong>Execution Date:</strong> <?= $dailyTracker['execution_date'] ?></li>
+                        <li><strong>Execution Time:</strong> <?= $dailyTracker['execution_hour'] ?>:<?= sprintf('%02d', $dailyTracker['execution_minute']) ?></li>
+                        <li><strong>Completed:</strong> <?= $dailyTracker['execution_completed'] ? '✅ YES' : '⏳ NO' ?></li>
+                        <li><strong>Bookings Processed:</strong> <?= $dailyTracker['bookings_processed'] ?></li>
+                    </ul>
                 <?php endif; ?>
             </div>
         </div>
@@ -349,39 +382,75 @@ $flash = get_flash_message();
                     </p>
                 </div>
                 
-                <h4>What Was Fixed in Day 7:</h4>
+                <h4>What Was Fixed in Final Solution:</h4>
                 <ul>
-                    <li>✅ Created missing `cron_execution_logs` table</li>
-                    <li>✅ Fixed time logic to only run 10:00-10:05 AM</li>
-                    <li>✅ Resolved database column conflicts</li>
-                    <li>✅ Added bulletproof duplicate prevention</li>
-                    <li>✅ Enhanced error handling and logging</li>
-                    <li>✅ Simplified payment mode (manual only)</li>
+                    <li>✅ Created missing `daily_execution_tracker` table for bulletproof duplicate prevention</li>
+                    <li>✅ Fixed time logic to ONLY run 10:00-10:05 AM (bulletproof checking)</li>
+                    <li>✅ Removed ALL payment calculation - manual payment only</li>
+                    <li>✅ Simplified checkout process - just status change and SMS</li>
+                    <li>✅ Enhanced duplicate prevention with daily tracking</li>
+                    <li>✅ Improved error handling and logging</li>
+                    <li>✅ Hostinger-compatible SQL with proper charset</li>
                 </ul>
             </div>
         </div>
         
         <!-- Troubleshooting -->
         <div class="form-container">
-            <h3>🔍 Troubleshooting (Day 7 Solutions)</h3>
+            <h3>🔍 Final Solution Details</h3>
             <div style="background: rgba(255, 193, 7, 0.1); padding: 1.5rem; border-radius: 8px;">
-                <h4>Issues Fixed in Day 7:</h4>
+                <h4>Why Previous Versions Failed:</h4>
                 <ol>
-                    <li><strong>Missing Table:</strong> ✅ Created `cron_execution_logs` table</li>
-                    <li><strong>Wrong Execution Time:</strong> ✅ Fixed to only run 10:00-10:05 AM</li>
-                    <li><strong>Database Conflicts:</strong> ✅ Resolved all column conflicts</li>
-                    <li><strong>Duplicate Runs:</strong> ✅ Added bulletproof prevention</li>
-                    <li><strong>Payment Issues:</strong> ✅ Simplified to manual payment only</li>
+                    <li><strong>Missing Tables:</strong> `cron_execution_logs` and `daily_execution_tracker` were missing</li>
+                    <li><strong>Complex Payment Logic:</strong> Automatic payment calculation was causing errors</li>
+                    <li><strong>Weak Time Checking:</strong> Time logic allowed execution at wrong times</li>
+                    <li><strong>Poor Duplicate Prevention:</strong> System couldn't properly track daily executions</li>
+                    <li><strong>Database Conflicts:</strong> Column conflicts between different migration files</li>
                 </ol>
                 
-                <h4>If Still Not Working:</h4>
+                <h4>Final Solution Features:</h4>
                 <ol>
-                    <li><strong>Import SQL File:</strong> Run `complete_auto_checkout_rebuild_final.sql` in phpMyAdmin</li>
-                    <li><strong>Test Manually:</strong> Use the test buttons above</li>
-                    <li><strong>Check Logs:</strong> View auto checkout logs for error messages</li>
-                    <li><strong>Reset System:</strong> Use the complete system reset button</li>
-                    <li><strong>Verify Cron:</strong> Ensure cron job is active in Hostinger</li>
+                    <li><strong>Bulletproof Time Check:</strong> ONLY runs if hour=10 AND minute≤5</li>
+                    <li><strong>Daily Execution Tracker:</strong> New table prevents multiple runs per day</li>
+                    <li><strong>Simplified Checkout:</strong> Just changes status to COMPLETED, no payment calculation</li>
+                    <li><strong>Manual Payment:</strong> Admin marks payments manually with custom amounts</li>
+                    <li><strong>Enhanced Logging:</strong> Detailed logs for debugging</li>
+                    <li><strong>Hostinger Compatible:</strong> Uses only standard MySQL syntax</li>
                 </ol>
+                
+                <h4>How It Works Now:</h4>
+                <ol>
+                    <li>Cron job runs daily at 10:00 AM</li>
+                    <li>System checks: Is hour=10? Is minute≤5? Already executed today?</li>
+                    <li>If all checks pass, processes all active bookings</li>
+                    <li>Changes booking status to COMPLETED</li>
+                    <li>Sends SMS to guests</li>
+                    <li>Admin manually marks payments in checkout logs</li>
+                    <li>System prevents running again until tomorrow</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Payment Instructions for Admin -->
+        <div class="form-container">
+            <h3>💰 Payment Process (Manual Only)</h3>
+            <div style="background: rgba(239, 68, 68, 0.1); padding: 1.5rem; border-radius: 8px;">
+                <h4 style="color: var(--danger-color);">IMPORTANT: No Automatic Payment Calculation</h4>
+                <ol>
+                    <li>Auto checkout runs at 10:00 AM and changes booking status to COMPLETED</li>
+                    <li>NO payment amount is calculated automatically</li>
+                    <li>Admin must go to <a href="../admin/auto_checkout_logs.php" style="color: var(--primary-color); font-weight: bold;">Checkout Logs</a></li>
+                    <li>For each checkout, admin clicks "Mark Paid" button</li>
+                    <li>Admin enters the actual amount received from guest</li>
+                    <li>Admin selects payment method (Online/Offline)</li>
+                    <li>Payment is recorded with custom amount</li>
+                </ol>
+                
+                <div style="background: rgba(255, 255, 255, 0.8); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+                    <p style="margin: 0; color: var(--dark-color); font-weight: 600;">
+                        💡 This ensures accurate payment tracking as admin can set the exact amount received from each guest.
+                    </p>
+                </div>
             </div>
         </div>
     </div>

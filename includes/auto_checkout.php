@@ -1,8 +1,9 @@
 <?php
 /**
- * COMPLETELY REBUILT Auto Checkout System - Day 7 Final Solution
+ * COMPLETELY REBUILT Auto Checkout System - Final Solution
  * GUARANTEED daily 10:00 AM execution with bulletproof logic
  * SIMPLIFIED VERSION - NO PAYMENT CALCULATION
+ * MANUAL PAYMENT ONLY - Admin marks payments after checkout
  */
 
 class AutoCheckout {
@@ -26,6 +27,7 @@ class AutoCheckout {
     /**
      * MAIN EXECUTION METHOD - GUARANTEED 10:00 AM DAILY EXECUTION
      * BULLETPROOF TIME CHECKING - ONLY RUNS 10:00-10:05 AM
+     * NO PAYMENT CALCULATION - MANUAL PAYMENT ONLY
      */
     public function executeDailyCheckout() {
         $this->log("=== AUTO CHECKOUT EXECUTION STARTED ===");
@@ -58,7 +60,7 @@ class AutoCheckout {
                     return $this->createResponse('wrong_minute', "Current minute is $currentMinute, execution window is 10:00-10:05 AM");
                 }
                 
-                // Check if already executed today
+                // Check if already executed today using new tracking table
                 if ($this->hasExecutedToday($currentDate)) {
                     $this->log("ALREADY EXECUTED TODAY", 'SKIP');
                     return $this->createResponse('already_executed', 'Auto checkout already executed today');
@@ -66,6 +68,11 @@ class AutoCheckout {
             }
             
             $this->log("TIME CHECK PASSED - Proceeding with checkout");
+            
+            // Mark today as execution day to prevent duplicates
+            if (!$isManualRun) {
+                $this->markExecutionDay($currentDate, $currentHour, $currentMinute);
+            }
             
             // Get bookings to checkout
             $bookings = $this->getBookingsForCheckout();
@@ -102,6 +109,11 @@ class AutoCheckout {
             $status = ($failed === 0) ? 'success' : (($successful > 0) ? 'partial' : 'failed');
             $this->recordExecution($currentDate, '10:00', $status, count($bookings), $successful, $failed);
             
+            // Mark execution as completed
+            if (!$isManualRun) {
+                $this->markExecutionCompleted($currentDate, count($bookings));
+            }
+            
             $this->log("=== AUTO CHECKOUT COMPLETED ===");
             $this->log("Total: " . count($bookings) . ", Successful: $successful, Failed: $failed");
             
@@ -124,6 +136,7 @@ class AutoCheckout {
     
     /**
      * SIMPLIFIED CHECKOUT PROCESSING - NO PAYMENT CALCULATION
+     * ADMIN MARKS PAYMENTS MANUALLY AFTER CHECKOUT
      */
     private function processSimpleCheckout($booking) {
         try {
@@ -156,16 +169,13 @@ class AutoCheckout {
                 $booking['id']
             ]);
             
-            // Calculate duration for logging only
-            $duration = $this->calculateDuration($booking['actual_check_in'] ?: $booking['check_in'], $checkoutDateTime);
-            
             // Log the checkout (NO PAYMENT AMOUNT)
             $stmt = $this->pdo->prepare("
                 INSERT INTO auto_checkout_logs 
                 (booking_id, resource_id, resource_name, guest_name, checkout_date, checkout_time, status, notes) 
                 VALUES (?, ?, ?, ?, ?, ?, 'success', ?)
             ");
-            $logNotes = "Automatic checkout - Duration: {$duration['hours']}h - Amount: ₹{$duration['amount']}";
+            $logNotes = "Automatic checkout - Admin will mark payment manually";
             $stmt->execute([
                 $booking['id'],
                 $booking['resource_id'],
@@ -176,25 +186,11 @@ class AutoCheckout {
                 $logNotes
             ]);
             
-            // Create payment record for admin to mark later
-            $stmt = $this->pdo->prepare("
-                INSERT INTO payments 
-                (booking_id, resource_id, amount, payment_method, payment_status, admin_id, payment_notes) 
-                VALUES (?, ?, ?, 'AUTO_CHECKOUT', 'COMPLETED', 1, ?)
-            ");
-            $paymentNotes = "Auto checkout at $checkoutDateTime - Duration: {$duration['hours']}h - Rate: ₹{$duration['rate']}/hour";
-            $stmt->execute([
-                $booking['id'],
-                $booking['resource_id'],
-                $duration['amount'],
-                $paymentNotes
-            ]);
-            
             // Send SMS notification
             $this->sendCheckoutSMS($booking);
             
             $this->pdo->commit();
-            $this->log("✅ Successfully checked out booking ID: {$booking['id']} - Amount: ₹{$duration['amount']}");
+            $this->log("✅ Successfully checked out booking ID: {$booking['id']} - Manual payment required");
             
             return ['success' => true];
             
@@ -227,35 +223,6 @@ class AutoCheckout {
     }
     
     /**
-     * Calculate duration and amount for logging
-     */
-    private function calculateDuration($checkIn, $checkOut) {
-        $start = new DateTime($checkIn);
-        $end = new DateTime($checkOut);
-        $diff = $start->diff($end);
-        
-        $hours = $diff->h + ($diff->days * 24);
-        $minutes = $diff->i;
-        
-        // Minimum 1 hour billing
-        if ($hours === 0 && $minutes > 0) {
-            $hours = 1;
-        }
-        
-        // Default rates (can be configured)
-        $rate = 100; // ₹100 per hour for rooms, ₹500 for halls
-        $amount = $hours * $rate;
-        
-        return [
-            'hours' => $hours,
-            'minutes' => $minutes,
-            'rate' => $rate,
-            'amount' => $amount,
-            'formatted' => sprintf('%dh %dm', $hours, $minutes)
-        ];
-    }
-    
-    /**
      * Get bookings that need to be checked out
      */
     private function getBookingsForCheckout() {
@@ -282,21 +249,55 @@ class AutoCheckout {
     }
     
     /**
-     * Check if auto checkout has already executed today
+     * Check if auto checkout has already executed today using new tracking table
      */
     private function hasExecutedToday($date) {
         try {
             $stmt = $this->pdo->prepare("
-                SELECT COUNT(*) FROM cron_execution_logs 
+                SELECT execution_completed FROM daily_execution_tracker 
                 WHERE execution_date = ? 
-                AND execution_type = 'automatic' 
-                AND execution_status IN ('success', 'no_bookings')
+                AND execution_completed = 1
             ");
             $stmt->execute([$date]);
             return $stmt->fetchColumn() > 0;
         } catch (Exception $e) {
             $this->log("Error checking execution history: " . $e->getMessage(), 'WARNING');
             return false;
+        }
+    }
+    
+    /**
+     * Mark execution day to prevent duplicates
+     */
+    private function markExecutionDay($date, $hour, $minute) {
+        try {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO daily_execution_tracker 
+                (execution_date, execution_hour, execution_minute, execution_completed) 
+                VALUES (?, ?, ?, 0)
+                ON DUPLICATE KEY UPDATE
+                execution_hour = VALUES(execution_hour),
+                execution_minute = VALUES(execution_minute)
+            ");
+            $stmt->execute([$date, $hour, $minute]);
+        } catch (Exception $e) {
+            $this->log("Error marking execution day: " . $e->getMessage(), 'WARNING');
+        }
+    }
+    
+    /**
+     * Mark execution as completed
+     */
+    private function markExecutionCompleted($date, $bookingsProcessed) {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE daily_execution_tracker 
+                SET execution_completed = 1, bookings_processed = ?
+                WHERE execution_date = ?
+            ");
+            $stmt->execute([$bookingsProcessed, $date]);
+        } catch (Exception $e) {
+            $this->log("Error marking execution completed: " . $e->getMessage(), 'WARNING');
         }
     }
     
@@ -322,7 +323,7 @@ class AutoCheckout {
             ");
             
             $executionType = $this->isManualRun() ? 'manual' : 'automatic';
-            $notes = "Day 7 Final Fix - Guaranteed 10:00 AM execution";
+            $notes = "Final Solution - Guaranteed 10:00 AM execution, manual payment only";
             
             $stmt->execute([
                 $date, 
