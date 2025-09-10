@@ -254,10 +254,28 @@ $flash = get_flash_message();
         <?php endif; ?>
 
         <div class="final-solution-notice">
-            🚨 FINAL SOLUTION ACTIVE - Manual Payment Only, Guaranteed 10:00 AM Execution
+            🎯 RELIABLE AUTO CHECKOUT ACTIVE - Popup-Based System, Manual Payment Only
         </div>
 
-        <h2>🕙 Auto Checkout Logs - Final Solution</h2>
+        <h2>🕙 Auto Checkout Logs - Reliable System</h2>
+        
+        <!-- Today's Status -->
+        <?php
+        require_once '../includes/reliable_auto_checkout.php';
+        $reliableAutoCheckout = new ReliableAutoCheckout($pdo);
+        $todayStatus = $reliableAutoCheckout->getTodayStatus();
+        ?>
+        
+        <div class="execution-status status-<?= $todayStatus['is_completed'] ? 'success' : 'pending' ?>">
+            <h3>Today's Reliable Auto Checkout Status</h3>
+            <p>Date: <?= $todayStatus['date'] ?> | Status: <?= $todayStatus['is_completed'] ? '✅ COMPLETED' : '⏳ PENDING' ?></p>
+            <?php if ($todayStatus['is_completed']): ?>
+                <p>Completed at: <?= date('g:i A', strtotime($todayStatus['completed_at'])) ?> | Rooms: <?= $todayStatus['rooms_processed'] ?></p>
+            <?php else: ?>
+                <p>Pending rooms: <?= $todayStatus['pending_rooms_count'] ?> | Current: <?= $todayStatus['current_time'] ?></p>
+                <p>Will trigger when any admin logs in after 10:00 AM</p>
+            <?php endif; ?>
+        </div>
         
         <!-- Today's Execution Status -->
         <?php if ($cronStatus): ?>
@@ -462,7 +480,8 @@ $flash = get_flash_message();
             <div style="background: rgba(37, 99, 235, 0.1); padding: 1.5rem; border-radius: 8px;">
                 <h4 style="color: var(--primary-color);">How to Mark Payments:</h4>
                 <ol>
-                    <li>Auto checkout runs at 10:00 AM and changes booking status to COMPLETED</li>
+                    <li>Auto checkout popup appears when admin logs in after 10:00 AM</li>
+                    <li>Admin confirms checkout - all bookings marked COMPLETED with 10:00 AM time</li>
                     <li>NO payment amount is calculated automatically</li>
                     <li>For each unpaid checkout above, click "Mark Paid" button</li>
                     <li>Enter the actual amount received from guest</li>
@@ -472,7 +491,7 @@ $flash = get_flash_message();
                 
                 <div style="background: rgba(255, 255, 255, 0.8); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
                     <p style="margin: 0; color: var(--dark-color); font-weight: 600;">
-                        💡 This ensures accurate payment tracking as you can set the exact amount received from each guest.
+                        💡 Reliable popup system ensures auto checkout happens daily when any admin logs in after 10:00 AM.
                     </p>
                 </div>
             </div>

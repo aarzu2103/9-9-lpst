@@ -196,6 +196,59 @@ $flash = get_flash_message();
             </div>
         <?php endif; ?>
 
+        <!-- Reliable Auto Checkout System Status -->
+        <?php
+        // Get reliable auto checkout status
+        require_once '../includes/reliable_auto_checkout.php';
+        $reliableAutoCheckout = new ReliableAutoCheckout($pdo);
+        $todayStatus = $reliableAutoCheckout->getTodayStatus();
+        ?>
+        
+        <div class="final-fix-notice">
+            🎯 RELIABLE AUTO CHECKOUT SYSTEM - POPUP-BASED SOLUTION
+            <br><small>Guaranteed execution when any admin logs in after 10:00 AM</small>
+        </div>
+        
+        <!-- Today's Auto Checkout Status -->
+        <div class="form-container">
+            <h3>📊 Today's Auto Checkout Status</h3>
+            <div style="background: <?= $todayStatus['is_completed'] ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 193, 7, 0.1)' ?>; padding: 1.5rem; border-radius: 8px; border: 2px solid <?= $todayStatus['is_completed'] ? '#10b981' : '#f59e0b' ?>;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <strong>Date:</strong> <?= $todayStatus['date'] ?>
+                    </div>
+                    <div>
+                        <strong>Status:</strong> 
+                        <span style="color: <?= $todayStatus['is_completed'] ? '#10b981' : '#f59e0b' ?>; font-weight: bold;">
+                            <?= $todayStatus['is_completed'] ? '✅ COMPLETED' : '⏳ PENDING' ?>
+                        </span>
+                    </div>
+                    <div>
+                        <strong>Current Time:</strong> <?= $todayStatus['current_time'] ?>
+                    </div>
+                    <div>
+                        <strong>Target Time:</strong> <?= $todayStatus['target_time'] ?>
+                    </div>
+                </div>
+                
+                <?php if ($todayStatus['is_completed']): ?>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.8); border-radius: 4px;">
+                        <p style="margin: 0; color: #155724; font-weight: 600;">
+                            ✅ Completed at: <?= date('g:i A', strtotime($todayStatus['completed_at'])) ?>
+                            | Method: <?= strtoupper($todayStatus['completion_method']) ?>
+                            | Rooms: <?= $todayStatus['rooms_processed'] ?>
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.8); border-radius: 4px;">
+                        <p style="margin: 0; color: #856404; font-weight: 600;">
+                            ⏳ Pending rooms: <?= $todayStatus['pending_rooms_count'] ?>
+                            | Will trigger when any admin logs in after 10:00 AM
+                        </p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
         <div class="final-fix-notice">
             🚨 FINAL SOLUTION APPLIED - AUTO CHECKOUT SYSTEM COMPLETELY REBUILT
             <br><small>All database conflicts resolved, bulletproof 10:00 AM execution, manual payment only</small>
@@ -420,13 +473,13 @@ $flash = get_flash_message();
                 
                 <h4>How It Works Now:</h4>
                 <ol>
-                    <li>Cron job runs daily at 10:00 AM</li>
-                    <li>System checks: Is hour=10? Is minute≤5? Already executed today?</li>
-                    <li>If all checks pass, processes all active bookings</li>
-                    <li>Changes booking status to COMPLETED</li>
-                    <li>Sends SMS to guests</li>
-                    <li>Admin manually marks payments in checkout logs</li>
-                    <li>System prevents running again until tomorrow</li>
+                    <li><strong>Reliable Method:</strong> When any admin logs in after 10:00 AM, mandatory popup appears</li>
+                    <li><strong>Popup Content:</strong> Shows all rooms that need checkout for previous day</li>
+                    <li><strong>One-Click Action:</strong> Admin clicks "Confirm Auto Checkout" (no other options)</li>
+                    <li><strong>Processing:</strong> All bookings marked as COMPLETED with 10:00 AM checkout time</li>
+                    <li><strong>Backup System:</strong> Cron job runs as verification between 10:00-11:00 AM</li>
+                    <li><strong>SMS Notifications:</strong> Sent to all checked-out guests</li>
+                    <li><strong>Payment:</strong> Admin manually marks payments in checkout logs</li>
                 </ol>
             </div>
         </div>
@@ -437,7 +490,8 @@ $flash = get_flash_message();
             <div style="background: rgba(239, 68, 68, 0.1); padding: 1.5rem; border-radius: 8px;">
                 <h4 style="color: var(--danger-color);">IMPORTANT: No Automatic Payment Calculation</h4>
                 <ol>
-                    <li>Auto checkout runs at 10:00 AM and changes booking status to COMPLETED</li>
+                    <li>Auto checkout popup appears when admin logs in after 10:00 AM</li>
+                    <li>Admin confirms checkout - all bookings marked COMPLETED with 10:00 AM time</li>
                     <li>NO payment amount is calculated automatically</li>
                     <li>Admin must go to <a href="../admin/auto_checkout_logs.php" style="color: var(--primary-color); font-weight: bold;">Checkout Logs</a></li>
                     <li>For each checkout, admin clicks "Mark Paid" button</li>
@@ -450,6 +504,30 @@ $flash = get_flash_message();
                     <p style="margin: 0; color: var(--dark-color); font-weight: 600;">
                         💡 This ensures accurate payment tracking as admin can set the exact amount received from each guest.
                     </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reliable System Information -->
+        <div class="form-container">
+            <h3>🎯 Reliable Auto Checkout System</h3>
+            <div style="background: rgba(37, 99, 235, 0.1); padding: 1.5rem; border-radius: 8px;">
+                <h4>Why This Solution is Reliable:</h4>
+                <ul>
+                    <li><strong>No Cron Dependency:</strong> Doesn't rely on cron jobs working perfectly</li>
+                    <li><strong>Admin Triggered:</strong> Activates when any admin logs in after 10:00 AM</li>
+                    <li><strong>Mandatory Popup:</strong> Cannot be dismissed or ignored</li>
+                    <li><strong>One-Click Process:</strong> Simple confirmation processes all pending checkouts</li>
+                    <li><strong>Backup System:</strong> Cron job provides verification and backup</li>
+                    <li><strong>Audit Trail:</strong> Complete logging of all actions and timings</li>
+                </ul>
+                
+                <h4>Backup Cron Job (Verification Only):</h4>
+                <div style="background: white; padding: 1rem; border-radius: 4px; margin: 0.5rem 0;">
+                    <code style="display: block; background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">
+                        */30 10-11 * * * /usr/bin/php /home/u261459251/domains/lpstnashik.in/public_html/cron/reliable_auto_checkout_backup.php
+                    </code>
+                    <small>Runs every 30 minutes between 10:00-11:00 AM as backup verification</small>
                 </div>
             </div>
         </div>

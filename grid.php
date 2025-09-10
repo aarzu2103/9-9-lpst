@@ -28,9 +28,10 @@ $flash = get_flash_message();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - L.P.S.T Bookings</title>
+    <meta name="csrf-token" content="<?= generate_csrf_token() ?>">
     <link rel="stylesheet" href="assets/style.css">
 </head>
-<body>
+<body data-user-role="<?= $_SESSION['role'] ?>">
     <nav class="top-nav">
         <div class="nav-links">
             <a href="advanced.php" class="nav-button">Advanced Booking</a>
@@ -308,6 +309,8 @@ $flash = get_flash_message();
         <?php endif; ?>
     </div>
 
+    <!-- Auto Checkout Popup JavaScript -->
+    <script src="assets/auto_checkout_popup.js"></script>
     <!-- Payment Modal for New Payments -->
     <div id="paymentModal" class="modal" style="display: none;">
         <div class="modal-content">
